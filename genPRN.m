@@ -1,58 +1,62 @@
-% 生成伪随机码
-
+% @file brief: 生成伪随机码
 %% 测试
 % bins = hex2bins('acdaee124', 24)
 % bin1s = oct2bins('40503', 14)
 %%
 % array_reduction([1 1 1 1 0 1 1 1 0 1], @xor)
 %                               
-%% 生成PRN 读取中频数据
-clear
-[codeai, codeaq, codebi, codebq] = GenE5Codes(7);
-%%
-ifdata = ReadIF('./20210428_A40ms.txt');
-%% 捕获
-SystemClockFre = 5.8e7; %记录回放仪采样率58MHz
-GALILEO_FREQ_COMPENSATE = -0.56439e6; %伽利略的中频频率
-GALILEO_CACODE_FREQ = 10.23e6; %伽利略的CA码速率10.23MHz
-GALILEO_CACODE_NUM = 10230; %伽利略的CA码长度
-
-f0 = GALILEO_FREQ_COMPENSATE;% 估计的中频频率
-f0_delta = 500;
-fs = 1.5*GALILEO_CACODE_FREQ;% 估计的副载波频率
-fs_delta = 5;
-cor_sum = zeros(800, 58000);
-
-% for i = 1:80
-%     f_temp = f0 - fs - 10000 + i*250;% e5a频率估计值
+% %% 生成PRN 读取中频数据
+% clear
+% [codeai, codeaq, codebi, codebq] = genPRN(7);
+% %%
+% ifdata = ReadIF('./20210428_A40ms.txt');
+% %% 捕获
+% SystemClockFre = 5.8e7; %记录回放仪采样率58MHz
+% GALILEO_FREQ_COMPENSATE = -0.56439e6; %伽利略的中频频率
+% GALILEO_CACODE_FREQ = 10.23e6; %伽利略的CA码速率10.23MHz
+% GALILEO_CACODE_NUM = 10230; %伽利略的CA码长度
+% 
+% f0 = GALILEO_FREQ_COMPENSATE;% 估计的中频频率
+% f0_delta = 500;
+% fs = 1.5*GALILEO_CACODE_FREQ;% 估计的副载波频率
+% fs_delta = 5;
+% cor_sum = zeros(1000, 58000);
+% 
+% % for i = 1:80
+% %     f_temp = f0 - fs - 10000 + i*250;% e5a频率估计值
+% %     DDCData = ifdata(1:58000).*exp(-1i*2*pi*f_temp/SystemClockFre*(1:58000)).';
+% %     parfor j = 1:10230*2
+% %         index = ceil(((1:58000)/58000*10230)+0.5*j);
+% %         index = mod(index-1, 10230) + 1;
+% %         cor_sum(i,j) = sum(codeaq(index).*DDCData);
+% %     end
+% % end
+% index = ceil(((1:58000)/58000*10230));
+% parfor i = 1:1000
+%     f_temp = f0 - fs - 10000 + i*5;% e5a频率估计值
 %     DDCData = ifdata(1:58000).*exp(-1i*2*pi*f_temp/SystemClockFre*(1:58000)).';
-%     parfor j = 1:10230*2
-%         index = ceil(((1:58000)/58000*10230)+0.5*j);
-%         index = mod(index-1, 10230) + 1;
-%         cor_sum(i,j) = sum(codeaq(index).*DDCData);
-%     end
+%     
+%     DDCData_F = fft(DDCData);
+%     codeaq_F = fft(codeaq(index));
+%     cor_sum(i,:) = (ifft(conj(DDCData_F).*codeaq_F));
 % end
-index = ceil(((1:58000)/58000*10230));
-parfor i = 1:800
-    f_temp = f0 - fs - 10000 + i*25;% e5a频率估计值
-    DDCData = ifdata(1:58000).*exp(-1i*2*pi*f_temp/SystemClockFre*(1:58000)).';
-    
-    DDCData_F = fft(DDCData);
-    codeaq_F = fft(codeaq(index));
-    cor_sum(i,:) = (ifft(conj(DDCData_F).*codeaq_F));
-end
+% %%
+% cor_sum_abs = abs(cor_sum(:));
+% %%
+% plot(cor_sum.');
+% %%
+% surf(cor_sum(450:1:500,3.53e4:3.54e4).*conj(cor_sum(450:1:500,3.53e4:3.54e4)),'LineStyle', 'none')
+% %%
+% surf(cor_sum(1:20:end,1:2:end).*conj(cor_sum(1:20:end,1:2:end)),'LineStyle', 'none')
+% %% 
+% cor_pow = cor_sum.*conj(cor_sum);
+% image(cor_pow.', 'CDataMapping','scaled');
+% colorbar
+% [r, w] = find(cor_pow == max(cor_pow, [], 'all'));
+% %%
+% save('./data/cor_sum.mat', 'cor_sum');
 %%
-cor_sum_abs = abs(cor_sum(:));
-%%
-plot(cor_sum.');
-%%
-surf(cor_sum(450:1:500,3.53e4:3.54e4).*conj(cor_sum(450:1:500,3.53e4:3.54e4)),'LineStyle', 'none')
-%%
-surf(cor_sum(1:10:end,1:2:end).*conj(cor_sum(1:10:end,1:2:end)),'LineStyle', 'none')
-%%
-save('./data/cor_sum.mat', 'cor_sum');
-%%
-function [codeai, codeaq, codebi, codebq] = GenE5Codes(svid)
+function [codeai, codeaq, codebi, codebq] = genPRN(svid)
 % @brief: 输出周期为10230的E5信号4路主码
 % @param:
 % svid - 卫星编号 1~32
@@ -114,13 +118,13 @@ codebq = zeros(10230,1);
 % 生成C/A码
 for i = 1:10230
     [c1ai, c2ai, phaseai, code] = GenPrimaryCodes(c1ai, c2ai, phaseai, 1);
-    codeai(i) = 2-2*code;
+    codeai(i) = 2*code-1;
     [c1aq, c2aq, phaseaq, code] = GenPrimaryCodes(c1aq, c2aq, phaseaq, 2);
-    codeaq(i) = 2-2*code;
+    codeaq(i) = 2*code-1;
     [c1bi, c2bi, phasebi, code] = GenPrimaryCodes(c1bi, c2bi, phasebi, 3);
-    codebi(i) = 2-2*code;
-    [c1bq, c2bq, phasebq, code] = GenPrimaryCodes(c1ai, c2ai, phasebq, 4);
-    codebq(i) = 2-2*code;
+    codebi(i) = 2*code-1;
+    [c1bq, c2bq, phasebq, code] = GenPrimaryCodes(c1bq, c2bq, phasebq, 4);
+    codebq(i) = 2*code-1;
 end
 end
 % 主码生成
