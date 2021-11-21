@@ -1,39 +1,47 @@
 % 捕获
-
+%a40ms
+%a40200ms 跳过了400s
 
 %%                             
 %% 生成PRN 读取中频数据
 clear
-[codeai, codeaq, codebi, codebq] = genPRN(7);
+[codeai, codeaq, codebi, codebq] = genPRN(36);
 %
 clear cor_sum_ai cor_sum_aq cor_sum_bi cor_sum_bq
 close all
 ifdata = ReadIF('./20210428_A40ms.txt');
-ifdata = ifdata(22581:end);
-%% fft捕获
+%
 clear cor_sum_ai cor_sum_aq cor_sum_bi cor_sum_bq
-% [cor_sum_ai, doppler_ai, codep_ai] = acquire_fft(ifdata, codeai, 1);                       
-% [cor_sum_aq, doppler_aq, codep_aq] = acquire_fft(ifdata, codeaq, 1);
-% [cor_sum_bi, doppler_bi, codep_bi] = acquire_fft(ifdata, codebi, 0);
-[cor_sum_bq, doppler_bq, codep_bq] = acquire_fft(ifdata, codebq, 0);
+ncoh_aq = zeros(250,116000);
+ncoh_bq = zeros(250,116000);
+for i = 1:16
+    %[cor_sum_ai, doppler_ai, codep_ai] = acquire_fft(ifdata, codeai, 1);
+    [cor_sum_aq, doppler_aq, codep_aq] = acquire_fft((ifdata((i-1)*116000+1:i*116000)), codeaq, 1);
+    %[cor_sum_bi, doppler_bi, codep_bi] = acquire_fft(ifdata, codebi, 0);
+    [cor_sum_bq, doppler_bq, codep_bq] = acquire_fft((ifdata((i-1)*116000+1:i*116000)), codebq, 0);
+    ncoh_aq = ncoh_aq + abs(cor_sum_aq);
+    ncoh_bq = ncoh_bq + abs(cor_sum_bq);
+end
+[freq_acqui_aq, code_phase_aq] = getmaxpeak(ncoh_aq);
+[freq_acqui_bq, code_phase_bq] = getmaxpeak(ncoh_bq);
+fun1 = @(x) surf(((1:25)*400-5000), ((1:58000)/58000*10230), (x(1:10:end,1:2:end).*conj(x(1:10:end,1:2:end))).','LineStyle', 'none');
 %% 精确捕获
 clear cor_sum_ai cor_sum_aq cor_sum_bi cor_sum_bq
 freq_acq = 920;
 code_acq = 1;
-% [cor_sum_ai] = acquire_acc(ifdata, codeai, 1, freq_acq, code_acq);
-% [cor_sum_aq] = acquire_acc(ifdata, codeaq, 1, freq_acq, code_acq);
-% [cor_sum_bi] = acquire_acc(ifdata, codebi, 0, freq_acq, code_acq);
+%[cor_sum_ai] = acquire_acc(ifdata, codeai, 1, freq_acq, code_acq);
+[cor_sum_aq] = acquire_acc(ifdata, codeaq, 1, freq_acq, code_acq);
+%[cor_sum_bi] = acquire_acc(ifdata, codebi, 0, freq_acq, code_acq);
 [cor_sum_bq] = acquire_acc(ifdata, codebq, 0, freq_acq, code_acq);
-%%
 fun1 = @(x) surf(((1:25)*400-5000), ((1:58000)/58000*10230), (x(1:20:end,1:2:end).*conj(x(1:20:end,1:2:end))).','LineStyle', 'none');
 %%
 figure(1)
-fun1(cor_sum_ai)
+fun1(ncoh_aq)
 xlabel('freq (Hz)')
 ylabel('code')
 %%
 figure(2)
-fun1(cor_sum_aq)
+fun1(ncoh_bq)
 xlabel('freq (Hz)')
 ylabel('code')
 %%
@@ -42,7 +50,6 @@ fun1(cor_sum_bi)
 xlabel('freq (Hz)')
 ylabel('code')
 %%
-fun1 = @(x) surf(((1:25)*400-5000), ((1:58000)/58000*10230), (x(1:20:end,1:2:end).*conj(x(1:20:end,1:2:end))).','LineStyle', 'none');
 figure(4)
 fun1(cor_sum_bq)
 xlabel('freq (Hz)')
@@ -114,12 +121,13 @@ function [cor_sum, freq_acqui, code_phase] = acquire_fft(ifdata, code, lowband)
 
 SystemClockFre = 5.8e7; %记录回放仪采样率58MHz
 GALILEO_FREQ_COMPENSATE = -0.56439e6; %伽利略的中频频率
+%GALILEO_FREQ_COMPENSATE = 4.092e6; %伽利略的中频频率
 GALILEO_CACODE_FREQ = 10.23e6; %伽利略的CA码速率10.23MHz
 GALILEO_CACODE_NUM = 10230; %伽利略的CA码长度
 
 Freq_Range = 10e3;% 捕获的频率范围20kHz -10kHz~10kHz
 f0 = GALILEO_FREQ_COMPENSATE;% 估计的中频频率
-f_delta = 20;% 捕获频率步进量 10Hz
+f_delta = 40;% 捕获频率步进量 10Hz
 fs = 1.5*GALILEO_CACODE_FREQ;% 估计的副载波频
 cor_1ms = SystemClockFre/1000;% 1ms的点数 58000
 
@@ -161,7 +169,7 @@ function [cor_sum] = acquire_acc(ifdata, code, lowband, freq_acq, code_acq)
 % cor_sum - 输出不同频率下的相关结果
 % @warning
 SystemClockFre = 5.8e7; %记录回放仪采样率58MHz
-GALILEO_FREQ_COMPENSATE = -0.56439e6; %伽利略的中频频率
+GALILEO_FREQ_COMPENSATE = 0.56439e6; %伽利略的中频频率
 GALILEO_CACODE_FREQ = 10.23e6; %伽利略的CA码速率10.23MHz
 GALILEO_CACODE_NUM = 10230; %伽利略的CA码长度
 
@@ -192,7 +200,7 @@ ifdata_2ms = ifdata(1:cor_1ms*2);% 截断到2ms
 % 求循环相关
 for i = 1:Freq_Range/f_delta
     f_temp = f_IF - Freq_Range/2 + i*f_delta + freq_acq;% e5a频率估计值
-    DDCData = ifdata_2ms.*exp(1i*2*pi*f_temp/SystemClockFre*(1:cor_1ms*2)).';%  下变频到中频
+    DDCData = ifdata_2ms.*exp(-1i*2*pi*f_temp/SystemClockFre*(1:cor_1ms*2)).';%  下变频到中频
     cor_sum2 = zeros(Code_Range/code_delta, 1);
     for j = 1:Code_Range/code_delta
         index = ceil((((1:cor_1ms*2)+j*code_delta-Code_Range/2 - code_acq + 1)/cor_1ms*GALILEO_CACODE_NUM));% 将prn码从20460个转换到58000个的转换序列
@@ -206,4 +214,22 @@ cor_pow = cor_sum.*conj(cor_sum);
 [r, w] = find(cor_pow == max(cor_pow, [], 'all'));
 freq_acqui = - Freq_Range/2 + r*f_delta;% 捕获的多普勒频率
 code_phase = w/cor_1ms*GALILEO_CACODE_NUM;% 码相位
+end
+
+function [freq_acqui, code_phase] = getmaxpeak(cor_result)
+SystemClockFre = 5.8e7; %记录回放仪采样率58MHz
+GALILEO_FREQ_COMPENSATE = -0.56439e6; %伽利略的中频频率
+%GALILEO_FREQ_COMPENSATE = 4.092e6; %伽利略的中频频率
+GALILEO_CACODE_FREQ = 10.23e6; %伽利略的CA码速率10.23MHz
+GALILEO_CACODE_NUM = 10230; %伽利略的CA码长度
+
+Freq_Range = 10e3;% 捕获的频率范围20kHz -10kHz~10kHz
+f0 = GALILEO_FREQ_COMPENSATE;% 估计的中频频率
+f_delta = 40;% 捕获频率步进量 10Hz
+fs = 1.5*GALILEO_CACODE_FREQ;% 估计的副载波频
+cor_1ms = SystemClockFre/1000;% 1ms的点数 58000
+
+[r, w] = find(cor_result == max(cor_result, [], 'all'));
+freq_acqui = - Freq_Range/2 + r*f_delta;% 捕获的多普勒频率
+code_phase =w;% 码相位
 end

@@ -118,13 +118,13 @@ codebq = zeros(10230,1);
 % 生成C/A码
 for i = 1:10230
     [c1ai, c2ai, phaseai, code] = GenPrimaryCodes(c1ai, c2ai, phaseai, 1);
-    codeai(i) = 2*code-1;
+    codeai(i) = 1-2*code;
     [c1aq, c2aq, phaseaq, code] = GenPrimaryCodes(c1aq, c2aq, phaseaq, 2);
-    codeaq(i) = 2*code-1;
+    codeaq(i) = 1-2*code;
     [c1bi, c2bi, phasebi, code] = GenPrimaryCodes(c1bi, c2bi, phasebi, 3);
-    codebi(i) = 2*code-1;
+    codebi(i) = 1-2*code;
     [c1bq, c2bq, phasebq, code] = GenPrimaryCodes(c1bq, c2bq, phasebq, 4);
-    codebq(i) = 2*code-1;
+    codebq(i) = 1-2*code;
 end
 end
 % 主码生成
